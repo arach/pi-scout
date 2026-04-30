@@ -1,12 +1,17 @@
 {
   "name": "pi-scout",
   "version": "0.1.0",
-  "description": "Scout coordination for pi — send/ask to any Scout agent via broker",
+  "description": "Scout tools for pi: send, ask, and who — via the local OpenScout broker.",
   "type": "module",
   "main": "index.ts",
+  "scripts": {
+    "postinstall": "node ./scripts/setup-host-mcp.mjs",
+    "setup:hosts": "node ./scripts/setup-host-mcp.mjs --verbose"
+  },
   "files": [
     "broker/",
     "config.ts",
+    "scripts/",
     "index.ts",
     "runtime.ts",
     "skills/",

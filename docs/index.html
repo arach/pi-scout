@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pi-scout — Scout coordination for pi</title>
+  <meta name="description" content="Scout-native tools for pi — send messages, ask agents, and see who's live in any pi session.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d1116;
+      --canvas:  #161d27;
+      --panel:   #212730;
+      --text:    #EBE7E4;
+      --muted:   #9fa4ab;
+      --accent:  #6A9FCC;
+      --border:  #2a3444;
+      --serif:   'EB Garamond', Georgia, serif;
+      --mono:    'JetBrains Mono', 'Menlo', 'Monaco', monospace;
+    }
+
+    html {
+      color-scheme: only dark;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--serif);
+      font-size: 18px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-image:
+        linear-gradient(hsla(218, 60%, 80%, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, hsla(218, 60%, 80%, 0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 64rem;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    /* ── Nav ── */
+    nav {
+      padding: 1.5rem 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-brand {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--text);
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+    .nav-brand .sep { color: var(--muted); }
+
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+    .nav-links a {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--accent); }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 6rem 0 5rem;
+    }
+
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--accent);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.4rem, 5vw, 3.75rem);
+      font-weight: 500;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+      max-width: 18ch;
+    }
+
+    .hero-sub {
+      font-size: 1.2rem;
+      color: var(--muted);
+      max-width: 48ch;
+      margin-bottom: 3rem;
+    }
+
+    /* ── Terminal panel ── */
+    .terminal {
+      background: var(--canvas);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      max-width: 38rem;
+      position: relative;
+    }
+
+    .terminal::before,
+    .terminal::after,
+    .terminal-body::before,
+    .terminal-body::after {
+      content: '·';
+      position: absolute;
+      font-family: var(--mono);
+      font-size: 0.6rem;
+      color: var(--border);
+      line-height: 1;
+    }
+    .terminal::before  { top: 6px;  left:  6px;  }
+    .terminal::after   { top: 6px;  right: 6px;  }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+    .terminal-title {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    .terminal-body {
+      padding: 1.2rem 1.5rem;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      line-height: 2;
+    }
+    .prompt { color: var(--muted); user-select: none; }
+    .cmd    { color: var(--text); }
+    .out    { color: var(--muted); padding-left: 1.2rem; }
+
+    /* ── Sections ── */
+    section {
+      padding: 4.5rem 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .label {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--accent);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 0.9rem;
+    }
+
+    h2 {
+      font-size: clamp(1.6rem, 3vw, 2.25rem);
+      font-weight: 500;
+      margin-bottom: 0.75rem;
+      line-height: 1.2;
+    }
+
+    .lead {
+      font-size: 1.05rem;
+      color: var(--muted);
+      max-width: 54ch;
+      margin-bottom: 2.75rem;
+    }
+
+    /* ── Tool cards ── */
+    .tools {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+    @media (max-width: 640px) {
+      .tools { grid-template-columns: 1fr; }
+    }
+
+    .tool {
+      background: var(--canvas);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.5rem;
+    }
+    .tool-name {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--accent);
+      margin-bottom: 0.6rem;
+    }
+    .tool-desc {
+      font-size: 0.95rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    /* ── Steps ── */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      max-width: 48rem;
+    }
+    .step {
+      display: flex;
+      gap: 1.75rem;
+    }
+    .step-n {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--accent);
+      flex-shrink: 0;
+      padding-top: 0.25rem;
+      width: 1.5rem;
+    }
+    .step h3 {
+      font-size: 1rem;
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+    }
+    .step p {
+      font-size: 0.95rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.82em;
+      color: var(--accent);
+      background: var(--panel);
+      padding: 0.1em 0.35em;
+      border-radius: 2px;
+    }
+
+    /* ── Requirements ── */
+    .reqs {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .reqs li {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .reqs li::before {
+      content: '—';
+      color: var(--accent);
+    }
+
+    /* ── Footer ── */
+    footer {
+      padding: 2.5rem 0 3rem;
+      border-top: 1px solid var(--border);
+    }
+    .footer-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .footer-row p {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .footer-row a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .footer-row a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <nav>
+      <a class="nav-brand" href="/">pi<span class="sep"> / </span>scout</a>
+      <ul class="nav-links">
+        <li><a href="https://pi.dev">pi.dev</a></li>
+        <li><a href="https://github.com/arach/pi-scout">GitHub</a></li>
+      </ul>
+    </nav>
+
+    <div class="hero">
+      <p class="eyebrow">pi extension</p>
+      <h1>Scout coordination for pi.</h1>
+      <p class="hero-sub">Send messages, ask agents, and see who's live — native Scout tools inside any pi session.</p>
+
+      <div class="terminal">
+        <div class="terminal-bar">
+          <div class="dot"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+          <span class="terminal-title">install</span>
+        </div>
+        <div class="terminal-body">
+          <div><span class="prompt">$ </span><span class="cmd">pi install git:github.com/arach/pi-scout</span></div>
+          <div><span class="prompt">$ </span><span class="cmd">scout setup</span></div>
+          <div class="out"># Scout MCP registered with Codex and Claude Code</div>
+        </div>
+      </div>
+    </div>
+
+    <section>
+      <p class="label">Tools</p>
+      <h2>Three tools.</h2>
+      <p class="lead">pi-scout adds three Scout-native tools to your pi session — nothing more, nothing less.</p>
+
+      <div class="tools">
+        <div class="tool">
+          <p class="tool-name">scout_send</p>
+          <p class="tool-desc">Send a message to any Scout agent by label or ID. Fire and forget.</p>
+        </div>
+        <div class="tool">
+          <p class="tool-name">scout_ask</p>
+          <p class="tool-desc">Ask a question and wait for the reply. Blocks until the flight completes.</p>
+        </div>
+        <div class="tool">
+          <p class="tool-name">scout_who</p>
+          <p class="tool-desc">List all known agents on the broker. See who's live before you route.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="label">How it works</p>
+      <h2>Broker-first, lazy by default.</h2>
+      <p class="lead">The extension stays inert until you invoke a Scout action. Once engaged, it connects to the local OpenScout broker and stays live for the session.</p>
+
+      <div class="steps">
+        <div class="step">
+          <span class="step-n">01</span>
+          <div>
+            <h3>Prefers the local Unix socket</h3>
+            <p>Connects via <code>OPENSCOUT_BROKER_SOCKET_PATH</code> or the default socket path at <code>~/Library/Application Support/OpenScout/</code>. Falls back to HTTP when needed.</p>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-n">02</span>
+          <div>
+            <h3>Registers MCP on install</h3>
+            <p>During install, pi-scout automatically registers the Scout MCP server with compatible local hosts — today that means Codex and Claude Code. Skip it with <code>PI_SCOUT_SKIP_HOST_MCP_SETUP=1</code>.</p>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-n">03</span>
+          <div>
+            <h3>Routes by label or ID</h3>
+            <p>Direct agent ID routing is supported alongside <code>@label</code> routing. Structured broker rejections surface cleanly — the extension never crashes on a bad route.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="label">Requirements</p>
+      <h2>What you need.</h2>
+      <ul class="reqs">
+        <li>pi</li>
+        <li>scout</li>
+        <li>Node.js 20+</li>
+        <li>A local OpenScout broker / runtime</li>
+      </ul>
+    </section>
+
+    <footer>
+      <div class="footer-row">
+        <p>MIT License · <a href="https://github.com/arach/pi-scout">github.com/arach/pi-scout</a></p>
+        <p><a href="https://pi.dev">pi.dev</a></p>
+      </div>
+    </footer>
+
+  </div>
+</body>
+</html>
