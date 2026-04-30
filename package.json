@@ -1,0 +1,41 @@
+{
+  "name": "pi-scout",
+  "version": "0.1.0",
+  "description": "Scout coordination for pi — send/ask to any Scout agent via broker",
+  "type": "module",
+  "main": "index.ts",
+  "files": [
+    "broker/",
+    "config.ts",
+    "index.ts",
+    "runtime.ts",
+    "skills/",
+    "target.ts",
+    "tools/",
+    "types.ts",
+    "ui/"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arach/pi-scout.git"
+  },
+  "homepage": "https://github.com/arach/pi-scout",
+  "bugs": {
+    "url": "https://github.com/arach/pi-scout/issues"
+  },
+  "keywords": [
+    "scout",
+    "pi",
+    "coordination",
+    "agent"
+  ],
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": ">=1.0.0"
+  },
+  "dependencies": {
+    "@openscout/protocol": "^0.2.63"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
