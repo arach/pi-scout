@@ -10,6 +10,10 @@ Scout coordination for `pi` sessions.
 
 It prefers the local OpenScout Unix socket and falls back to HTTP when needed.
 
+## Design Notes
+
+- [Inbound reachability proposal](./docs/inbound-reachability-proposal.md)
+
 ## Install
 
 From GitHub:
