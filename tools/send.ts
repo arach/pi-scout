@@ -1,4 +1,4 @@
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { brokerClient } from "../broker/client.ts";
 import type { ScoutDeliverResponse } from "@openscout/protocol";
 import type { ScoutRuntime } from "../runtime.ts";

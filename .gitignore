@@ -1,2 +1,4 @@
 node_modules/
 .DS_Store
+# OpenScout local state
+.openscout/project.json

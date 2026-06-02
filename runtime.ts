@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { brokerClient } from "./broker/client.ts";
 import { loadConfig } from "./config.ts";
 import type { ScoutEvent } from "./types.ts";

@@ -61,7 +61,7 @@ ln -s ~/dev/pi-scout ~/.pi/agent/extensions/pi-scout
 
 ## Requirements
 
-- `pi`
+- Earendil `pi` (`@earendil-works/pi-coding-agent`)
 - `scout`
 - Node.js 20+
 - A local OpenScout broker/runtime
