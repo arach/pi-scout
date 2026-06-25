@@ -4,7 +4,7 @@ import type { AgentInfo, DeliverParams } from "./types.ts";
 export type ScoutTargetInput = string | Pick<AgentInfo, "id" | "label">;
 
 export interface ResolvedScoutTarget {
-  routeTarget: DeliverParams["target"];
+  routeTarget: NonNullable<DeliverParams["target"]>;
   displayTarget: string;
 }
 

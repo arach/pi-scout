@@ -193,11 +193,8 @@
     /* ── Tool cards ── */
     .tools {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
       gap: 1.25rem;
-    }
-    @media (max-width: 640px) {
-      .tools { grid-template-columns: 1fr; }
     }
 
     .tool {
@@ -334,17 +331,21 @@
 
     <section>
       <p class="label">Tools</p>
-      <h2>Three tools.</h2>
-      <p class="lead">pi-scout adds three Scout-native tools to your pi session — nothing more, nothing less.</p>
+      <h2>Four tools.</h2>
+      <p class="lead">pi-scout adds Scout-native messaging, asks, work updates, and agent discovery to your pi session.</p>
 
       <div class="tools">
         <div class="tool">
           <p class="tool-name">scout_send</p>
-          <p class="tool-desc">Send a message to any Scout agent by label or ID. Fire and forget.</p>
+          <p class="tool-desc">Send a broker-backed message or status update to a known Scout target.</p>
         </div>
         <div class="tool">
           <p class="tool-name">scout_ask</p>
-          <p class="tool-desc">Ask a question and wait for the reply. Blocks until the flight completes.</p>
+          <p class="tool-desc">Ask for owned work by target, exact session, or project path with an optional harness.</p>
+        </div>
+        <div class="tool">
+          <p class="tool-name">scout_work_update</p>
+          <p class="tool-desc">Update durable work item state for progress, waiting, review, completion, or cancellation.</p>
         </div>
         <div class="tool">
           <p class="tool-name">scout_who</p>

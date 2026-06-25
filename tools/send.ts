@@ -30,7 +30,7 @@ export function createScoutSendTool(runtime: ScoutRuntime) {
       _id: string,
       params: { target: string; body: string; channel?: string },
       _signal: AbortSignal,
-      _onUpdate: (update: unknown) => void,
+      _onUpdate: (update: any) => void,
       ctx: ExtensionContext,
     ) {
       await runtime.ensureEngaged(ctx);
@@ -38,6 +38,7 @@ export function createScoutSendTool(runtime: ScoutRuntime) {
       if (!resolvedTarget) {
         return {
           content: [{ type: "text" as const, text: "Pick a Scout target first." }],
+          details: undefined,
         };
       }
 

@@ -1,6 +1,20 @@
 import { request as httpRequest, type ClientRequest, type IncomingMessage } from "node:http";
-import type { FlightRecord, ScoutDeliverResponse } from "@openscout/protocol";
-import type { BrokerSnapshot, DeliverParams, ScoutEvent } from "../types.ts";
+import { randomUUID } from "node:crypto";
+import type {
+  CollaborationEvent,
+  CollaborationEventKind,
+  CollaborationProgress,
+  CollaborationWaitingOn,
+  FlightRecord,
+  WorkItemRecord,
+} from "@openscout/protocol";
+import type {
+  BrokerSnapshot,
+  DeliverParams,
+  PiScoutDeliverResponse,
+  ScoutEvent,
+  WorkItemUpdateParams,
+} from "../types.ts";
 import { resolveBrokerHttpUrl, resolveSocketPaths } from "../config.ts";
 
 // ─── HTTP-over-socket ─────────────────────────────────────────────────────────
@@ -167,6 +181,99 @@ async function httpFallback<T>(
 let _snapshotCache: BrokerSnapshot | null = null;
 let _snapshotCacheAt = 0;
 
+function normalizeOptionalString(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function normalizeStringList(values: string[] | undefined): string[] | undefined {
+  if (!values) return undefined;
+  const seen = new Set<string>();
+  const normalized = values
+    .map((value) => value.trim())
+    .filter((value) => {
+      if (!value || seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    });
+  return normalized.length ? normalized : undefined;
+}
+
+function normalizeProgress(progress: CollaborationProgress | null | undefined): CollaborationProgress | undefined {
+  if (!progress) return undefined;
+  const normalized: CollaborationProgress = {};
+  if (typeof progress.completedSteps === "number") normalized.completedSteps = progress.completedSteps;
+  if (typeof progress.totalSteps === "number") normalized.totalSteps = progress.totalSteps;
+  if (typeof progress.percent === "number") normalized.percent = progress.percent;
+  if (typeof progress.checkpoint === "string" && progress.checkpoint.trim()) {
+    normalized.checkpoint = progress.checkpoint.trim();
+  }
+  if (typeof progress.summary === "string" && progress.summary.trim()) {
+    normalized.summary = progress.summary.trim();
+  }
+  return Object.keys(normalized).length ? normalized : undefined;
+}
+
+function normalizeWaitingOn(waitingOn: CollaborationWaitingOn | null | undefined): CollaborationWaitingOn | undefined {
+  if (!waitingOn) return undefined;
+  const label = waitingOn.label.trim();
+  if (!label) return undefined;
+  return {
+    ...waitingOn,
+    label,
+    targetId: normalizeOptionalString(waitingOn.targetId),
+  };
+}
+
+function deriveWorkItemEventKind(
+  previous: WorkItemRecord,
+  next: WorkItemRecord,
+): CollaborationEventKind {
+  if (next.acceptanceState !== previous.acceptanceState) {
+    if (next.acceptanceState === "accepted") return "accepted";
+    if (next.acceptanceState === "reopened") return "reopened";
+  }
+
+  if (next.state !== previous.state) {
+    switch (next.state) {
+      case "waiting":
+        return "waiting";
+      case "review":
+        return "review_requested";
+      case "done":
+        return "done";
+      case "cancelled":
+        return "cancelled";
+      case "working":
+        return previous.state === "open" ? "claimed" : "progressed";
+      case "open":
+      default:
+        return "progressed";
+    }
+  }
+
+  if (next.ownerId !== previous.ownerId || next.nextMoveOwnerId !== previous.nextMoveOwnerId) {
+    return "handoff";
+  }
+
+  return "progressed";
+}
+
+function summarizeWorkItem(record: WorkItemRecord): string {
+  return record.progress?.summary?.trim()
+    || record.summary?.trim()
+    || record.title.trim();
+}
+
+function isWorkItemRecord(value: unknown): value is WorkItemRecord {
+  return Boolean(
+    value
+      && typeof value === "object"
+      && (value as { kind?: unknown }).kind === "work_item"
+      && typeof (value as { id?: unknown }).id === "string",
+  );
+}
+
 export const brokerClient = {
   async getSnapshot(force = false): Promise<BrokerSnapshot> {
     const now = Date.now();
@@ -174,35 +281,135 @@ export const brokerClient = {
       return _snapshotCache;
     }
 
-    const raw = await requestBroker<{
-      agents: Record<string, unknown>;
-      endpoints: Record<string, unknown>;
-    }>(
+    const raw = await requestBroker<BrokerSnapshot>(
       "GET",
       "/v1/snapshot",
     );
-    const snapshot = { agents: raw.agents, endpoints: raw.endpoints };
+    const snapshot = {
+      agents: raw.agents,
+      endpoints: raw.endpoints,
+      collaborationRecords: raw.collaborationRecords,
+    };
 
     _snapshotCache = snapshot;
     _snapshotCacheAt = now;
     return snapshot;
   },
 
-  async deliver(params: DeliverParams): Promise<ScoutDeliverResponse> {
+  async deliver(params: DeliverParams): Promise<PiScoutDeliverResponse> {
     const payload = {
       intent: params.intent,
       body: params.body,
       target: params.target,
+      targetLabel: params.targetLabel,
+      targetAgentId: params.targetAgentId,
+      targetSessionId: params.targetSessionId,
       channel: params.channel,
+      replyToMessageId: params.replyToMessageId,
+      replyToSessionId: params.replyToSessionId,
+      ensureAwake: params.ensureAwake,
+      execution: params.execution,
+      projectAgent: params.projectAgent,
+      labels: params.labels,
+      collaborationRecordId: params.collaborationRecordId,
       workItem: params.workItem,
+      messageMetadata: params.messageMetadata,
+      invocationMetadata: params.invocationMetadata,
     };
 
-    return await requestBroker<ScoutDeliverResponse>(
+    return await requestBroker<PiScoutDeliverResponse>(
       "POST",
       "/v1/deliver",
       payload,
       { acceptedStatuses: [409, 422] },
     );
+  },
+
+  async updateWorkItem(params: WorkItemUpdateParams): Promise<WorkItemRecord> {
+    const workId = params.workId.trim();
+    const snapshot = await this.getSnapshot(true);
+    const current = snapshot.collaborationRecords?.[workId];
+    if (!isWorkItemRecord(current)) {
+      throw new Error(`Unknown Scout work item: ${workId}`);
+    }
+
+    const now = Date.now();
+    const nextState = params.state ?? current.state;
+    const nextSummary =
+      params.summary === undefined
+        ? current.summary
+        : normalizeOptionalString(params.summary);
+    const nextOwnerId =
+      params.ownerId === undefined
+        ? current.ownerId
+        : normalizeOptionalString(params.ownerId);
+    const nextMoveOwnerId =
+      params.nextMoveOwnerId === undefined
+        ? current.nextMoveOwnerId
+        : normalizeOptionalString(params.nextMoveOwnerId);
+    const nextPriority =
+      params.priority === undefined
+        ? current.priority
+        : (params.priority ?? undefined);
+    const nextLabels =
+      params.labels === undefined
+        ? current.labels
+        : normalizeStringList(params.labels);
+    const nextProgress =
+      params.progress === undefined
+        ? current.progress
+        : normalizeProgress(params.progress);
+    const waitingOn =
+      params.waitingOn === undefined
+        ? nextState === "waiting" ? current.waitingOn : undefined
+        : normalizeWaitingOn(params.waitingOn);
+
+    const updated: WorkItemRecord = {
+      ...current,
+      title: normalizeOptionalString(params.title) ?? current.title,
+      summary: nextSummary,
+      state: nextState,
+      acceptanceState: params.acceptanceState ?? current.acceptanceState,
+      ownerId: nextOwnerId,
+      nextMoveOwnerId,
+      priority: nextPriority,
+      labels: nextLabels,
+      waitingOn,
+      progress: nextProgress,
+      updatedAt: now,
+      startedAt: current.startedAt ?? (nextState === "working" ? now : current.startedAt),
+      reviewRequestedAt:
+        nextState === "review"
+          ? (current.reviewRequestedAt ?? now)
+          : current.reviewRequestedAt,
+      completedAt:
+        nextState === "done" || nextState === "cancelled"
+          ? (current.completedAt ?? now)
+          : current.completedAt,
+      metadata: params.metadata
+        ? { ...(current.metadata ?? {}), ...params.metadata }
+        : current.metadata,
+    };
+
+    await requestBroker("POST", "/v1/collaboration/records", updated);
+
+    const event: CollaborationEvent = {
+      id: `evt-${randomUUID()}`,
+      recordId: updated.id,
+      recordKind: "work_item",
+      kind: deriveWorkItemEventKind(current, updated),
+      actorId: normalizeOptionalString(params.actorId) ?? process.env.OPENSCOUT_AGENT ?? "operator",
+      at: now,
+      summary: normalizeOptionalString(params.eventSummary) ?? summarizeWorkItem(updated),
+      metadata: {
+        source: "pi-scout",
+      },
+    };
+
+    await requestBroker("POST", "/v1/collaboration/events", event);
+
+    _snapshotCache = null;
+    return updated;
   },
 
   async waitForFlight(
