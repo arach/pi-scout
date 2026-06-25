@@ -7,8 +7,12 @@ Scout coordination for `pi` sessions.
 - `scout_send`
 - `scout_ask`
 - `scout_who`
+- `scout_work_update`
 
 It prefers the local OpenScout Unix socket and falls back to HTTP when needed.
+`scout_ask` supports known targets, exact session continuity, and project-routed
+asks with optional `harness`. Project paths are routing context for fresh work;
+use returned flight, conversation, work, ref, or session handles for follow-up.
 
 ## Design Notes
 
@@ -91,5 +95,6 @@ If `socketPath` is `null`, `pi-scout` uses:
 
 - The extension stays inert until you invoke a Scout action.
 - Structured broker rejections are surfaced cleanly instead of crashing the extension.
-- Direct agent ID routing is supported alongside `@label` routing.
+- Direct agent ID routing is supported alongside `@label`, `projectPath`, and `targetSessionId` routing.
+- Durable work progress should use `scout_work_update` when an ask returned a work item.
 - Full inbound reachability for `pi` is still evolving; see the proposal above for the planned attach, endpoint, inbox, and reply flow.

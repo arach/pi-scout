@@ -17,7 +17,7 @@ export function createScoutWhoTool(runtime: ScoutRuntime) {
       _id: string,
       _params: Record<string, never>,
       _signal: AbortSignal,
-      _onUpdate: (update: unknown) => void,
+      _onUpdate: (update: any) => void,
       ctx: ExtensionContext,
     ) {
       await runtime.ensureEngaged(ctx);

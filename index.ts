@@ -7,6 +7,7 @@ import { brokerClient } from "./broker/client.ts";
 import { createScoutSendTool } from "./tools/send.ts";
 import { createScoutAskTool } from "./tools/ask.ts";
 import { createScoutWhoTool } from "./tools/who.ts";
+import { createScoutWorkUpdateTool } from "./tools/work-update.ts";
 import { AgentPickerOverlay } from "./ui/agent-picker.ts";
 import { ComposeOverlay } from "./ui/compose.ts";
 import { loadConfig } from "./config.ts";
@@ -19,8 +20,9 @@ export default function registerPiScoutExtension(pi: ExtensionAPI) {
 
   // ─── Tools ──────────────────────────────────────────────────────────────
   pi.registerTool(createScoutSendTool(runtime));
-  pi.registerTool(createScoutAskTool(runtime));
+  pi.registerTool(createScoutAskTool(runtime) as any);
   pi.registerTool(createScoutWhoTool(runtime));
+  pi.registerTool(createScoutWorkUpdateTool(runtime));
 
   // ─── Commands ───────────────────────────────────────────────────────────
   pi.registerCommand("scout", {
