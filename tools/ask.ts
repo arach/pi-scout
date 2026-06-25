@@ -121,7 +121,7 @@ export function createScoutAskTool(runtime: ScoutRuntime) {
       await runtime.ensureEngaged(ctx);
       let resolvedTarget: ResolvedAskTarget | null;
       try {
-        resolvedTarget = await resolveAskTarget(params);
+        resolvedTarget = await resolveAskTarget(params, ctx.cwd);
       } catch (error) {
         return {
           content: [
@@ -264,7 +264,10 @@ function normalizeLabels(labels: string[] | undefined): string[] | undefined {
   return normalized.length ? [...new Set(normalized)] : undefined;
 }
 
-async function resolveAskTarget(params: ScoutAskParams): Promise<ResolvedAskTarget | null> {
+async function resolveAskTarget(
+  params: ScoutAskParams,
+  currentDirectory: string,
+): Promise<ResolvedAskTarget | null> {
   const target = normalizeOptionalString(params.target);
   const targetSessionId = normalizeOptionalString(params.targetSessionId);
   const projectPath = normalizeOptionalString(params.projectPath);
@@ -282,7 +285,7 @@ async function resolveAskTarget(params: ScoutAskParams): Promise<ResolvedAskTarg
   }
 
   if (projectPath) {
-    const resolvedProjectPath = resolve(projectPath);
+    const resolvedProjectPath = resolve(currentDirectory, projectPath);
     return {
       routeTarget: { kind: "project_path", projectPath: resolvedProjectPath },
       displayTarget: resolvedProjectPath,
@@ -298,7 +301,7 @@ async function resolveAskTarget(params: ScoutAskParams): Promise<ResolvedAskTarg
   }
 
   if (normalizeOptionalString(params.harness)) {
-    const resolvedProjectPath = resolve(process.cwd());
+    const resolvedProjectPath = resolve(currentDirectory);
     return {
       routeTarget: { kind: "project_path", projectPath: resolvedProjectPath },
       displayTarget: resolvedProjectPath,
