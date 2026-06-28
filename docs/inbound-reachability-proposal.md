@@ -23,11 +23,11 @@ The extension:
 
 It does **not** currently:
 
-- register an endpoint
-- appear honestly online in `scout who`
-- maintain an inbox or unread state
+- maintain a durable inbox or unread state
 - support threaded read/reply flows
 - offer a true broker-to-pi invocation path
+
+Current broker versions create an active endpoint when `pi-scout` upserts its agent card. The extension now uses a short per-session identity, refreshes the registration while engaged, and best-effort deletes the endpoint on shutdown.
 
 This proposal recommends a **two-phase design**:
 
@@ -50,19 +50,16 @@ This is good groundwork, but it is not yet a full “reachable agent” story.
 
 ### Practical gaps
 
-1. **No endpoint registration**
-   `scout_who` derives liveness from endpoints, not cards alone. Without an endpoint, pi appears effectively offline.
+1. **Limited reachability contract**
+   The extension can observe broker events and advertises message reachability metadata, but it does not yet advertise or implement full invoke support.
 
-2. **No honest reachability contract**
-   The extension can observe broker events, but it is not yet advertising what kinds of inbound work it can actually handle.
-
-3. **No inbox**
+2. **No inbox**
    Live notifications are not enough. A user needs to read recent inbound messages, track unread state, and reply later.
 
-4. **No threaded reply flow**
+3. **No threaded reply flow**
    Replies should preserve `conversationId` and `replyToMessageId`, rather than always creating a fresh target-only send.
 
-5. **No invocation transport**
+4. **No invocation transport**
    The extension can read events, but Scout does not yet have a direct “invoke this pi session and stream back a result” path through `pi-scout`.
 
 ## Do We Have A Pi Adapter?

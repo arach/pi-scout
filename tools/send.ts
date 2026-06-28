@@ -45,6 +45,7 @@ export function createScoutSendTool(runtime: ScoutRuntime) {
       const response = await brokerClient.deliver({
         intent: "tell",
         body: params.body,
+        caller: runtime.callerContext(ctx),
         target: resolvedTarget.routeTarget,
         channel: params.channel,
       });

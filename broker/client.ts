@@ -285,9 +285,10 @@ export const brokerClient = {
       "GET",
       "/v1/snapshot",
     );
-    const snapshot = {
+    const snapshot: BrokerSnapshot = {
       agents: raw.agents,
       endpoints: raw.endpoints,
+      flights: raw.flights,
       collaborationRecords: raw.collaborationRecords,
     };
 
@@ -300,6 +301,7 @@ export const brokerClient = {
     const payload = {
       intent: params.intent,
       body: params.body,
+      caller: params.caller,
       target: params.target,
       targetLabel: params.targetLabel,
       targetAgentId: params.targetAgentId,
@@ -424,16 +426,16 @@ export const brokerClient = {
         throw new Error("waitForFlight aborted");
       }
 
-      const raw = await requestBroker<{ deliveries: FlightRecord[] }>(
-        "GET",
-        `/v1/deliveries?ids=${encodeURIComponent(flightId)}`,
-      );
-      const flight = raw.deliveries.find((f) => f.id === flightId);
-      if (flight?.state === "completed") return flight;
-      if (flight?.state === "failed") {
-        throw new Error(`Flight failed: ${flight.summary ?? flightId}`);
+      const snapshot = await this.getSnapshot(true);
+      const flight = snapshot.flights?.[flightId];
+      if (!flight) {
+        throw new Error(`Flight ${flightId} is no longer available.`);
       }
-      if (flight?.state === "cancelled") {
+      if (flight.state === "completed") return flight;
+      if (flight.state === "failed") {
+        throw new Error(`Flight failed: ${flight.summary ?? flight.error ?? flightId}`);
+      }
+      if (flight.state === "cancelled") {
         throw new Error(`Flight cancelled: ${flight.summary ?? flightId}`);
       }
 

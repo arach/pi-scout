@@ -43,16 +43,16 @@ export default function registerPiScoutExtension(pi: ExtensionAPI) {
       }
 
       if (subcommand === "send") {
-        await handleSendAsk("send", restStr, extCtx);
+        await handleSendAsk("send", restStr, extCtx, runtime);
         return;
       }
 
       if (subcommand === "ask") {
-        await handleSendAsk("ask", restStr, extCtx);
+        await handleSendAsk("ask", restStr, extCtx, runtime);
         return;
       }
 
-      await handleSendAsk("send", trimmed, extCtx);
+      await handleSendAsk("send", trimmed, extCtx, runtime);
     },
   });
 }
@@ -61,13 +61,14 @@ async function handleSendAsk(
   mode: "send" | "ask",
   rawArgs: string,
   ctx: ExtensionCommandContext,
+  runtime: ReturnType<typeof createScoutRuntime>,
 ) {
   const parsed = await parseTargetAndBody(rawArgs);
 
   if (parsed?.body) {
     const text = mode === "send"
-      ? await sendScoutMessage(parsed.target, parsed.body)
-      : await askScoutAgent(parsed.target, parsed.body, ctx.signal);
+      ? await sendScoutMessage(parsed.target, parsed.body, runtime.callerContext(ctx))
+      : await askScoutAgent(parsed.target, parsed.body, ctx.signal, runtime.callerContext(ctx));
     ctx.ui.notify(text, "info");
     return;
   }
@@ -112,8 +113,8 @@ async function handleSendAsk(
   }
 
   const text = mode === "send"
-    ? await sendScoutMessage(target, composeResult.body)
-    : await askScoutAgent(target, composeResult.body, ctx.signal);
+    ? await sendScoutMessage(target, composeResult.body, runtime.callerContext(ctx))
+    : await askScoutAgent(target, composeResult.body, ctx.signal, runtime.callerContext(ctx));
   ctx.ui.notify(text, "info");
 }
 
@@ -170,6 +171,7 @@ function startsWithExplicitTargetSyntax(value: string): boolean {
 async function sendScoutMessage(
   target: ScoutTargetInput,
   body: string,
+  caller: Parameters<typeof brokerClient.deliver>[0]["caller"],
 ): Promise<string> {
   const resolvedTarget = await resolveScoutTarget(target);
   if (!resolvedTarget) {
@@ -179,6 +181,7 @@ async function sendScoutMessage(
   const response = await brokerClient.deliver({
     intent: "tell",
     body,
+    caller,
     target: resolvedTarget.routeTarget,
   });
 
@@ -192,7 +195,8 @@ async function sendScoutMessage(
 async function askScoutAgent(
   target: ScoutTargetInput,
   body: string,
-  signal?: AbortSignal,
+  signal: AbortSignal | undefined,
+  caller: Parameters<typeof brokerClient.deliver>[0]["caller"],
 ): Promise<string> {
   const resolvedTarget = await resolveScoutTarget(target);
   if (!resolvedTarget) {
@@ -204,6 +208,7 @@ async function askScoutAgent(
   const response = await brokerClient.deliver({
     intent: "consult",
     body,
+    caller,
     target: resolvedTarget.routeTarget,
   });
 

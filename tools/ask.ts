@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { brokerClient } from "../broker/client.ts";
 import { loadConfig } from "../config.ts";
 import type { FlightRecord } from "@openscout/protocol";
@@ -39,7 +39,7 @@ type ResolvedAskTarget = {
   inferredProject: boolean;
 };
 
-export function createScoutAskTool(runtime: ScoutRuntime) {
+export function createScoutAskTool(runtime: ScoutRuntime): ToolDefinition<any, PiScoutDeliverResponse | FlightRecord | undefined> {
   return {
     name: "scout_ask",
     label: "Scout Ask",
@@ -151,6 +151,7 @@ export function createScoutAskTool(runtime: ScoutRuntime) {
       const response = await brokerClient.deliver({
         intent: "consult",
         body: params.body,
+        caller: runtime.callerContext(ctx),
         target: resolvedTarget.routeTarget,
         targetLabel: resolvedTarget.displayTarget,
         targetSessionId:

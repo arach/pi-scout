@@ -77,6 +77,7 @@ export type PiScoutDeliverResponse = ScoutDeliverResponse & {
 export type BrokerSnapshot = {
   agents: Record<string, AgentDefinition>;
   endpoints: Record<string, AgentEndpoint>;
+  flights?: Record<string, FlightRecord>;
   collaborationRecords?: Record<string, WorkItemRecord | unknown>;
 };
 
@@ -91,6 +92,7 @@ export interface AgentInfo {
 export interface DeliverParams {
   intent: "tell" | "consult";
   body: string;
+  caller?: ScoutDeliverRequest["caller"];
   target?: ScoutRouteTarget;
   targetLabel?: string;
   targetAgentId?: string;

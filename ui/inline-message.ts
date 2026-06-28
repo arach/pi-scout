@@ -19,23 +19,24 @@ export class InlineScoutMessage implements Component {
   render(width: number): string[] {
     const contentWidth = Math.max(1, width - 2);
 
+    const eventLike = this.event as unknown as Record<string, unknown>;
     const sender =
-      (this.event as Record<string, unknown>).senderLabel
-      ?? (this.event as Record<string, unknown>).sender
+      eventLike.senderLabel
+      ?? eventLike.sender
       ?? "unknown";
     const body =
-      (this.event as Record<string, unknown>).body
-      ?? (this.event as Record<string, unknown>).message
+      eventLike.body
+      ?? eventLike.message
       ?? "";
     const ageStr = this.age > 0 ? ` · ${this.age}s ago` : "";
 
     const lines: string[] = [];
     const border = (text: string) => this.theme.fg("accent", text);
-    const labelWidth = visibleWidth(`Scout Message from ${sender}${ageStr}`);
+    const labelWidth = visibleWidth(`Scout Message from ${String(sender)}${ageStr}`);
 
     lines.push(
       border(
-        `┌─ ${this.theme.bold("Scout Message from")} ${this.theme.fg("success", sender)}${ageStr}${"─".repeat(Math.max(0, contentWidth - labelWidth - 4))}┐`,
+        `┌─ ${this.theme.bold("Scout Message from")} ${this.theme.fg("success", String(sender))}${ageStr}${"─".repeat(Math.max(0, contentWidth - labelWidth - 4))}┐`,
       ),
     );
 

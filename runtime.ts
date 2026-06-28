@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { basename } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { brokerClient } from "./broker/client.ts";
 import { loadConfig } from "./config.ts";
@@ -11,20 +13,28 @@ type ScoutNotification = {
 export interface ScoutRuntime {
   ensureEngaged(ctx: ExtensionContext): Promise<void>;
   noteContext(ctx: ExtensionContext): void;
+  callerContext(ctx?: ExtensionContext): {
+    actorId: string;
+    displayName: string;
+    handle: string;
+    currentDirectory?: string;
+  } | undefined;
   dispose(): void;
 }
 
 export function createScoutRuntime(pi: ExtensionAPI): ScoutRuntime {
   let currentCtx: ExtensionContext | undefined;
-  let currentAgentId: string | undefined;
+  let currentRegistration: PiScoutRegistration | undefined;
   let warnedAboutDisconnect = false;
   let sawBrokerEvent = false;
   let engaged = false;
+  let registrationActive = false;
   let subscription: { cancel: () => void } | undefined;
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
 
   function noteContext(ctx: ExtensionContext): void {
     currentCtx = ctx;
-    currentAgentId = sessionHandleFor(ctx);
+    currentRegistration = registrationFor(ctx);
   }
 
   async function ensureEngaged(ctx: ExtensionContext): Promise<void> {
@@ -37,27 +47,73 @@ export function createScoutRuntime(pi: ExtensionAPI): ScoutRuntime {
     const config = loadConfig();
     if (!config.autoRegister) return;
 
-    try {
-      await brokerClient.upsertAgentCard({
-        id: `pi-scout-${currentAgentId}`,
-        agentId: currentAgentId!,
-        displayName: "pi",
-        handle: currentAgentId!,
-        harness: "pi",
-        transport: "local_socket",
-        projectRoot: ctx.cwd,
-        currentDirectory: ctx.cwd,
-        nodeId: "local",
-        sessionId: ctx.sessionManager.getSessionFile() ?? String(Date.now()),
-      });
-    } catch {
-      // Broker may not be running yet.
-    }
+    registrationActive = await refreshRegistration(ctx);
+    startHeartbeat();
+  }
+
+  function callerContext(ctx = currentCtx): {
+    actorId: string;
+    displayName: string;
+    handle: string;
+    currentDirectory?: string;
+  } | undefined {
+    if (!currentRegistration || !registrationActive) return undefined;
+    return {
+      actorId: currentRegistration.agentId,
+      displayName: currentRegistration.displayName,
+      handle: currentRegistration.handle,
+      currentDirectory: ctx?.cwd,
+    };
   }
 
   function dispose(): void {
     subscription?.cancel();
     subscription = undefined;
+    if (heartbeat) {
+      clearInterval(heartbeat);
+      heartbeat = undefined;
+    }
+  }
+
+  async function refreshRegistration(ctx = currentCtx): Promise<boolean> {
+    if (!ctx || !currentRegistration) return false;
+    const now = Date.now();
+    try {
+      await brokerClient.upsertAgentCard({
+        id: currentRegistration.endpointId,
+        agentId: currentRegistration.agentId,
+        displayName: currentRegistration.displayName,
+        handle: currentRegistration.handle,
+        selector: currentRegistration.selector,
+        harness: "pi",
+        transport: "local_socket",
+        projectRoot: ctx.cwd,
+        currentDirectory: ctx.cwd,
+        sessionId: currentRegistration.sessionId,
+        metadata: {
+          presenceMode: "extension",
+          supportsInboundMessages: true,
+          supportsReplies: false,
+          supportsInvoke: false,
+          sessionFile: currentRegistration.sessionFile,
+          engagedAt: currentRegistration.engagedAt,
+          lastSeenAt: now,
+        },
+      });
+      registrationActive = true;
+      return true;
+    } catch {
+      // Broker may not be running yet.
+      registrationActive = false;
+      return false;
+    }
+  }
+
+  function startHeartbeat(): void {
+    if (heartbeat) return;
+    heartbeat = setInterval(() => {
+      void refreshRegistration();
+    }, 25_000);
   }
 
   function startEventSubscription(): void {
@@ -68,7 +124,7 @@ export function createScoutRuntime(pi: ExtensionAPI): ScoutRuntime {
         (event) => {
           sawBrokerEvent = true;
           warnedAboutDisconnect = false;
-          const notification = summarizeScoutEvent(event, currentAgentId);
+          const notification = summarizeScoutEvent(event, currentRegistration?.agentId);
           if (!notification || !currentCtx?.hasUI) return;
           currentCtx.ui.notify(notification.message, notification.type);
         },
@@ -93,19 +149,54 @@ export function createScoutRuntime(pi: ExtensionAPI): ScoutRuntime {
   }
 
   pi.on("session_shutdown", async () => {
+    const endpointId = currentRegistration?.endpointId;
     dispose();
+    registrationActive = false;
+    if (endpointId) {
+      try {
+        await brokerClient.deleteEndpoint(endpointId);
+      } catch {
+        // Best effort: the broker may already be down.
+      }
+    }
   });
 
   return {
     ensureEngaged,
     noteContext,
+    callerContext,
     dispose,
   };
 }
 
-function sessionHandleFor(ctx: ExtensionContext): string {
-  const sessionFile = ctx.sessionManager.getSessionFile();
-  return sessionFile ? `pi.${sessionFile}` : "pi";
+type PiScoutRegistration = {
+  agentId: string;
+  endpointId: string;
+  displayName: string;
+  handle: string;
+  selector: string;
+  sessionId: string;
+  sessionFile?: string;
+  engagedAt: number;
+};
+
+function registrationFor(ctx: ExtensionContext): PiScoutRegistration {
+  const sessionFile = ctx.sessionManager.getSessionFile() ?? undefined;
+  const stableInput = sessionFile ?? `${ctx.cwd}:ephemeral`;
+  const hash = createHash("sha256").update(stableInput).digest("hex").slice(0, 10);
+  const sessionId = sessionFile ? basename(sessionFile, ".jsonl") : `ephemeral-${hash}`;
+  const handle = `pi-${hash}`;
+
+  return {
+    agentId: `pi.${hash}`,
+    endpointId: `pi-scout.${hash}`,
+    displayName: "pi",
+    handle,
+    selector: `@${handle}`,
+    sessionId,
+    sessionFile,
+    engagedAt: Date.now(),
+  };
 }
 
 function summarizeScoutEvent(

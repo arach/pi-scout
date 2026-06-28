@@ -95,6 +95,8 @@ If `socketPath` is `null`, `pi-scout` uses:
 
 - The extension stays inert until you invoke a Scout action.
 - Structured broker rejections are surfaced cleanly instead of crashing the extension.
+- For fresh work, prefer project/capability routing: pass `projectPath` plus optional `harness` to `scout_ask` and let the broker choose or create the worker.
 - Direct agent ID routing is supported alongside `@label`, `projectPath`, and `targetSessionId` routing.
 - Durable work progress should use `scout_work_update` when an ask returned a work item.
-- Full inbound reachability for `pi` is still evolving; see the proposal above for the planned attach, endpoint, inbox, and reply flow.
+- Once engaged, pi-scout registers a short per-session Scout identity (for example `@pi-abc123def0`), refreshes endpoint liveness, and unregisters the endpoint on shutdown when possible.
+- Basic inbound notifications are available while engaged. Durable inbox, unread state, threaded reply flows, and broker-to-pi invocation execution are still evolving; see the proposal above.
